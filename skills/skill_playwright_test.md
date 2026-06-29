@@ -1,4 +1,4 @@
-# Playwright Test Skill
+# Playwright E2E Test Skill
 
 ## Metadata
 
@@ -6,29 +6,42 @@
 - **Applicable scenarios**: Writing or debugging E2E tests for web applications, especially with third-party SSO, multi-step registration, dynamic modals, or any flow where page behavior is unpredictable
 - **Created**: 2026-06-29
 
-## What this skill does
-
-A CLI tool (`pw-test`) that connects to a running Chrome instance via CDP and executes one browser action per invocation. Instead of writing a full Playwright script and running it blindly, an agent can step through a session: `goto` → `snapshot` → `click` → `snapshot` → `fill` → `snapshot`, observing the DOM state after each step.
-
 ## Goal
 
-Understand a web application's page structure and interaction flow through incremental exploration, then use that understanding to write reliable Playwright automation scripts.
+Write reliable Playwright E2E tests by first exploring the target application's page structure and interaction flow through incremental CDP debugging, then automating the discovered flow.
+
+## Why this skill exists
+
+E2E test writing is an exploration problem, not a coding problem. You can't write reliable automation for a flow you haven't observed. When an agent writes a full Playwright script upfront — without knowing what modals will appear, what selectors will resolve, what redirects will happen — it ends up in a guess-and-retry loop that burns tokens without converging.
+
+This skill prescribes a manual-first methodology: explore the page step by step using CDP, observe what actually happens at each interaction, then write automation that reproduces the observed flow. The CLI (`pw-test`) provides the step-by-step primitives that make this practical from a terminal.
 
 ## Acceptance Criteria
 
-1. An agent can start CDP Chrome, navigate through a multi-step flow (login, registration, form submission), and capture the DOM state at each step using only `pw-test` CLI commands
-2. `snapshot` output is sufficient for an agent to identify the next action (element selectors, visible text, modal content) without needing screenshots
-3. After exploration, the agent can write a Playwright test script that reproduces the discovered steps
-4. The CLI works with any Chrome/Chromium instance that has `--remote-debugging-port` enabled
+1. An agent reading this skill file can follow the manual-first methodology without additional guidance
+2. The agent uses `snapshot` (text DOM state) as the primary observation tool, not screenshots
+3. After exploration, the agent writes a Playwright test script that reproduces the discovered steps with `wait_for` selectors instead of fixed timeouts
+4. The agent cleans up the CDP Chrome profile after the session to avoid stale session tokens in future runs
+
+## Methodology
+
+1. **Start CDP Chrome** with a fresh user-data-dir (clean profile avoids stale SSO session tokens)
+2. **Navigate** to the target page with `pw-test goto`
+3. **Snapshot** with `pw-test snapshot` to see the full DOM state — this is the primary tool
+4. **Interact** with `pw-test click`/`fill` based on what the snapshot revealed
+5. **Snapshot again** after each interaction to observe what changed
+6. **Repeat** until the full flow is understood
+7. **Write the Playwright test** that reproduces the discovered steps with `wait_for` selectors instead of fixed timeouts
+8. **Clean up**: kill Chrome, remove the user-data-dir
 
 ## Available Resources
 
-- **CLI**: `pw-test` (installed via `pip install -e .`)
+- **CLI**: `pw-test` (installed via `pip install -e .` from [grapeot/playwright-test-skill](https://github.com/grapeot/playwright-test-skill))
 - **CDP Chrome**: agent starts Chrome with `--remote-debugging-port=9222 --user-data-dir=/tmp/pw_debug_profile`
 - **Playwright**: required Python package, Chromium browser must be installed (`python -m playwright install chromium`)
 - **Env var**: `PW_TEST_CDP_URL` (default `http://localhost:9222`)
 
-## Commands
+### CLI Commands
 
 | Command | Args | Description |
 |---------|------|-------------|
@@ -43,17 +56,6 @@ Understand a web application's page structure and interaction flow through incre
 | `title` | — | Print page title |
 | `screenshot` | `<path>` | Save full-page screenshot |
 | `storage` | — | Print cookies and localStorage |
-
-## Methodology
-
-1. **Start CDP Chrome** with a fresh user-data-dir (clean profile avoids stale session tokens)
-2. **Navigate** to the target page with `goto`
-3. **Snapshot** to see the full DOM state — this is the primary tool
-4. **Interact** with `click`/`fill` based on what `snapshot` revealed
-5. **Snapshot again** after each interaction to see what changed
-6. **Repeat** until the full flow is understood
-7. **Write the Playwright test** that reproduces the discovered steps with `wait_for` selectors instead of fixed timeouts
-8. **Clean up**: kill Chrome, remove the user-data-dir
 
 ## Known Pitfalls
 

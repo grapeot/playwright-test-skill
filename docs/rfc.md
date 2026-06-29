@@ -2,6 +2,38 @@
 
 ## Architecture
 
+This project is a **skill** (reusable AI agent capability definition) backed by a CLI tool. The skill file is the primary artifact; the CLI is an enabling resource.
+
+```text
+Skill file (skill_playwright_test.md)
+  └── defines: goal, methodology, acceptance criteria, known pitfalls
+  └── references: CLI as available resource
+
+CLI (pw-test)
+  └── connects to Chrome via CDP
+  └── one command per invocation, browser persists
+  └── text-based snapshot output for agent consumption
+
+Agent workflow:
+  1. Reads skill file → understands manual-first methodology
+  2. Starts CDP Chrome
+  3. Uses pw-test commands to explore page step by step
+  4. Writes Playwright test reproducing observed flow
+  5. Cleans up
+```
+
+## Skill File Structure
+
+The skill file (`skills/skill_playwright_test.md`) follows the meta-skill guidelines:
+- **Goal**: one-sentence definition of what the skill accomplishes
+- **Why**: the problem this skill solves (exploration before automation)
+- **Acceptance criteria**: testable success conditions
+- **Methodology**: manual-first CDP debugging approach (explore → observe → automate)
+- **Available resources**: CLI commands, CDP Chrome setup, Playwright dependency
+- **Known pitfalls**: real failures encountered during E2E development
+
+## CLI Architecture
+
 ```text
 AI Agent (terminal)
   └── pw-test <command> [args...]
@@ -16,8 +48,6 @@ Chrome (separate process, started by agent)
   --user-data-dir=/tmp/pw_debug_profile
 ```
 
-## CDP Connection
-
 Each CLI invocation:
 1. Connects to `http://localhost:9222` via `playwright.chromium.connect_over_cdp()`
 2. Gets the first existing browser context (or creates one)
@@ -26,58 +56,36 @@ Each CLI invocation:
 5. Prints output to stdout
 6. Returns exit code 0 on success, 1 on error
 
-The browser is not closed by the CLI — it persists across invocations. The agent starts it once with `--remote-debugging-port` and closes it manually when done.
+The browser is not closed by the CLI — it persists across invocations.
 
 ## Command Specifications
 
 ### `goto <url>`
-- Navigate to URL with `wait_until="domcontentloaded"` (not `networkidle` — SPA pages may never reach idle)
+- Navigate with `wait_until="domcontentloaded"` (not `networkidle` — SPAs may never reach idle)
 - Timeout: 30s
 - Output: `URL: <url>` and `Title: <title>`
 
 ### `click <selector>`
-- Wait for element to be visible (10s timeout)
-- Click with 5s timeout
-- Uses Playwright's `locator()` API for CSS + text selectors
-- Output: `Clicked: <selector>` or error message
+- Wait for element visible (10s), click (5s)
+- Playwright selector syntax (CSS + text)
+- Output: `Clicked: <selector>` or error
 
 ### `fill <selector> <value>`
-- Wait for element to be visible (10s timeout)
-- Fill with 5s timeout
-- Output: `Filled: <selector> = <value>` or error message
+- Wait for element visible (10s), fill (5s)
+- Output: `Filled: <selector> = <value>` or error
 
 ### `snapshot`
-The core command. Prints:
+The core observation primitive. Prints:
 - URL and title
 - Body text (first 2000 chars)
 - All `<input>` elements: name, type, placeholder, visible, value
-- All `<button>` and `<a role="button">` elements: text, visible, disabled
+- All `<button>` elements: text, visible, disabled
 - First 10 `<a>` links: text, href, visible
-- Modal content (if `div.ReactModalPortal` exists)
-- Format is plain text with section headers, parseable by agents
+- Modal content (ReactModalPortal, `[role="dialog"]`, `.modal`)
+- Plain text format, parseable by agents without vision
 
-### `wait <ms>`
-- `page.wait_for_timeout(ms)`
-- Output: `Waited <ms>ms`
-
-### `reload`
-- Reload with `wait_until="domcontentloaded"`
-- Output: `Reloaded. URL: <url>`
-
-### `eval <js_expression>`
-- Evaluate JS in page context
-- Output: `Result: <result>`
-
-### `url` / `title`
-- Print just the URL or title
-
-### `screenshot <path>`
-- Full-page screenshot
-- Output: `Screenshot saved: <path>`
-
-### `storage`
-- Print all cookies and localStorage entries
-- Useful for debugging SSO session state
+### `wait <ms>` / `reload` / `eval <js>` / `url` / `title` / `screenshot <path>` / `storage`
+Standard utilities. See CLI `--help` for details.
 
 ## Dependencies
 
@@ -86,12 +94,12 @@ The core command. Prints:
 
 ## Environment
 
-- No `.env` needed — CDP URL is hardcoded to `http://localhost:9222` (configurable via `PW_TEST_CDP_URL` env var)
+- No `.env` needed — CDP URL is `http://localhost:9222` (configurable via `PW_TEST_CDP_URL`)
 - No API keys, no credentials, no sensitive data
 
 ## Error Handling
 
-- CDP connection failure: clear error message with instructions to start Chrome
+- CDP connection failure: clear error with instructions to start Chrome
 - Element not found: print timeout error, don't crash
 - JS eval failure: print exception message
 - All errors go to stderr, results go to stdout
