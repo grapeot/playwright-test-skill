@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Public CLI tool for CDP step-by-step browser debugging. English working language. Public GitHub repo.
+A skill that teaches AI agents how to debug web E2E tests through manual-first CDP exploration. The skill file is the primary artifact; the CLI (`pw-test`) is an enabling resource. English working language. Public GitHub repo.
 
 ## Project Structure
 

@@ -1,10 +1,12 @@
 # Playwright Test Skill
 
-A CLI tool that lets AI agents interactively debug web applications through Chrome DevTools Protocol (CDP).
+A skill that teaches AI agents how to debug web E2E tests through a manual-first CDP approach, backed by a CLI for step-by-step browser interaction.
 
-## Why
+## What this is
 
-When writing E2E tests for web applications (especially with third-party SSO, multi-step registration, or dynamic modals), you don't know what the page will do next. Writing a full Playwright automation script upfront leads to repeated failures: wrong selectors, unexpected modals, missing waits. This tool lets you step through a browser session one action at a time — `goto`, `snapshot`, `click`, `fill` — observing the DOM state after each step before committing to automation.
+This is a **skill** for AI coding agents — a reusable capability definition that prescribes a methodology for writing reliable E2E tests. The skill is backed by a CLI tool (`pw-test`) that provides step-by-step browser interaction primitives, enabling the agent to explore a live page before committing to automation.
+
+The core insight: E2E test writing is an exploration problem, not a coding problem. You can't write reliable automation for a flow you haven't observed. The skill teaches agents to explore first (using the CLI to step through a real browser session), then automate (writing a Playwright script that reproduces the observed flow).
 
 ## Install
 
@@ -25,7 +27,7 @@ python -m playwright install chromium
 On macOS, the Chromium path is typically:
 `~/Library/Caches/ms-playwright/chromium-XXXX/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`
 
-### 2. Run commands
+### 2. Follow the skill methodology
 
 ```bash
 pw-test goto "http://localhost:3000"
@@ -43,7 +45,7 @@ pkill -f "remote-debugging-port=9222"
 rm -rf /tmp/pw_debug_profile
 ```
 
-## Commands
+## CLI Commands
 
 | Command | Description |
 |---------|-------------|
@@ -65,22 +67,11 @@ rm -rf /tmp/pw_debug_profile
 |----------|---------|-------------|
 | `PW_TEST_CDP_URL` | `http://localhost:9222` | CDP endpoint URL |
 
-## How AI Agents Can Use This
-
-1. Start CDP Chrome (see step 1 above)
-2. Use `goto` to navigate to the target page
-3. Use `snapshot` to see the full DOM state in text form
-4. Based on the snapshot, use `click`/`fill` to interact with elements
-5. Use `snapshot` again after each interaction to see what changed
-6. Once the flow is understood, write a Playwright test script that reproduces the steps
-
-The `snapshot` command is designed to be the primary tool — it gives a complete text representation of the page without needing screenshots, which many AI agents cannot process.
-
 ## Install as a Skill
 
-To integrate this tool into an AI agent's workspace:
+To integrate this skill into an AI agent's workspace:
 
 1. Clone this repo
 2. Install: `pip install -e . && python -m playwright install chromium`
 3. Point your workspace's skill discovery (e.g. `rules/skills/INDEX.md` or `AGENTS.md`) to `skills/skill_playwright_test.md` in this repo
-4. The agent can now use `pw-test` commands directly from the terminal
+4. The agent can now follow the skill methodology and use `pw-test` commands from the terminal
