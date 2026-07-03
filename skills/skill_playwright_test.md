@@ -8,20 +8,35 @@
 
 ## Goal
 
-Write reliable Playwright E2E tests by first exploring the target application's page structure and interaction flow through incremental CDP debugging, then automating the discovered flow.
+Help an AI agent turn an unknown or unstable browser flow into a reliable E2E test or a defensible diagnosis by observing the live page step by step before writing automation.
+
+## When to Use This Skill
+
+Use this skill when the browser flow is not already well understood:
+
+- Third-party SSO, OTP, OAuth callbacks, payment, or other multi-domain flows
+- Dynamic SPAs where selectors, modals, redirects, or async rendering are uncertain
+- E2E failures where the agent needs to determine whether the problem is product behavior, test environment, auth configuration, stale browser state, or bad test data
+- Bugfix work where the agent should first reproduce the visible failure, then automate the regression check
+
+Do not use this skill for simple, deterministic component tests or API-only behavior. If a normal Playwright test can be written from the code alone, the CDP exploration loop is unnecessary overhead.
 
 ## Why this skill exists
 
 E2E test writing is an exploration problem, not a coding problem. You can't write reliable automation for a flow you haven't observed. When an agent writes a full Playwright script upfront — without knowing what modals will appear, what selectors will resolve, what redirects will happen — it ends up in a guess-and-retry loop that burns tokens without converging.
 
-This skill prescribes a manual-first methodology: explore the page step by step using CDP, observe what actually happens at each interaction, then write automation that reproduces the observed flow. The CLI (`pw-test`) provides the step-by-step primitives that make this practical from a terminal.
+This skill prescribes a manual-first methodology: explore the page step by step using CDP, observe what actually happens at each interaction, then write automation that reproduces the observed flow. The CLI (`pw-test`) provides the observation and interaction primitives that make this practical from a terminal.
+
+The core judgment is not "drive everything through the UI." For complex SSO or callback flows, a hybrid test is often more reliable: use the browser for the part that genuinely requires a browser session, then use protocol/API calls for deterministic assertions.
 
 ## Acceptance Criteria
 
 1. An agent reading this skill file can follow the manual-first methodology without additional guidance
 2. The agent uses `snapshot` (text DOM state) as the primary observation tool, not screenshots
-3. After exploration, the agent writes a Playwright test script that reproduces the discovered steps with `wait_for` selectors instead of fixed timeouts
-4. The agent cleans up the CDP Chrome profile after the session to avoid stale session tokens in future runs
+3. When a selector or expected page state is missing, the agent captures diagnostics (`diagnose`, URL, body text, controls, optional screenshot) before changing code or adding timeouts
+4. Bugfix-oriented E2E work first demonstrates the old behavior failing, then verifies the fixed behavior passing
+5. After exploration, the agent writes a Playwright test script that reproduces the discovered steps with condition-based waits instead of fixed timeouts
+6. The agent cleans up the CDP Chrome profile after the session to avoid stale session tokens in future runs
 
 ## Methodology
 
@@ -29,10 +44,19 @@ This skill prescribes a manual-first methodology: explore the page step by step 
 2. **Navigate** to the target page with `pw-test goto`
 3. **Snapshot** with `pw-test snapshot` to see the full DOM state — this is the primary tool
 4. **Interact** with `pw-test click`/`fill` based on what the snapshot revealed
-5. **Snapshot again** after each interaction to observe what changed
-6. **Repeat** until the full flow is understood
-7. **Write the Playwright test** that reproduces the discovered steps with `wait_for` selectors instead of fixed timeouts
-8. **Clean up**: kill Chrome, remove the user-data-dir
+5. **Wait on conditions**, not time: use `wait-for-selector` or `wait-for-url` when the next state is known
+6. **Diagnose before retrying**: if the expected selector or URL does not appear, run `pw-test diagnose` before adding sleeps or changing product code
+7. **Repeat** until the full flow is understood
+8. **Write the Playwright test** that reproduces the discovered steps with condition-based waits instead of fixed timeouts
+9. **Clean up**: kill Chrome, remove the user-data-dir
+
+## Hybrid E2E Pattern
+
+For third-party auth and callback flows, the reliable boundary is often smaller than the whole UI journey. A good test can use Playwright to perform browser-only work (entering credentials, solving an OTP flow, accepting a consent screen, capturing an authorization code), then switch to protocol/API calls to verify the product behavior deterministically.
+
+This is still E2E if it validates the real integration boundary. The browser is a tool for acquiring realistic session state; it does not have to be the mechanism for every assertion.
+
+Use this pattern when full UI automation is dominated by third-party redirects, timing, or provider UI changes, while the product assertion can be made more reliably through HTTP/API.
 
 ## Available Resources
 
@@ -49,6 +73,10 @@ This skill prescribes a manual-first methodology: explore the page step by step 
 | `click` | `<selector>` | Click an element (Playwright selector syntax) |
 | `fill` | `<selector> <value>` | Fill an input field |
 | `snapshot` | — | Print full page state: URL, title, body text, all inputs, buttons, links, modals |
+| `diagnose` | `[screenshot_path]` | Print URL/title/referrer/body/controls and optionally save a screenshot |
+| `elements` | `<selector>` | Print count, text, visibility, enabled state, and bounding boxes for matching elements |
+| `wait-for-selector` | `<selector> [state] [timeout_ms]` | Wait for selector state (`visible` by default) |
+| `wait-for-url` | `<pattern> [timeout_ms]` | Wait for the current URL to match a Playwright URL pattern |
 | `wait` | `<ms>` | Wait for duration in milliseconds |
 | `reload` | — | Reload the page |
 | `eval` | `<js>` | Evaluate JavaScript in page context |
@@ -90,6 +118,22 @@ This skill prescribes a manual-first methodology: explore the page step by step 
 **Cause:** Register creates the user and sets a password, but doesn't constitute a sign-in. `lastSignInAt` only updates on actual sign-in.
 
 **Fix:** `has_logged_in=0` after register is expected behavior. To verify `has_logged_in=1`, the guest must complete a real sign-in (not register).
+
+### 5. Selector missing does not imply product bug
+
+**Symptom:** A locator times out, and the agent starts changing selectors or product code blindly.
+
+**Cause:** The browser may be on an auth provider error page, a wrong redirect URI, a stale session state, or a different environment than expected.
+
+**Fix:** Run `pw-test diagnose` before retrying. First classify the failure: product behavior, test environment, third-party auth configuration, browser session state, or test data state.
+
+### 6. Full UI automation is not always the most reliable E2E boundary
+
+**Symptom:** The agent spends most of the time fighting third-party redirects, callback timing, or provider UI changes, while the product assertion is simple.
+
+**Cause:** The test is trying to drive every step through the UI even when only part of the flow requires a browser.
+
+**Fix:** Use the hybrid E2E pattern. Let Playwright acquire the realistic browser/session artifact, then verify product behavior through API/protocol calls when that gives a more deterministic assertion.
 
 ## Relationship to other skills
 

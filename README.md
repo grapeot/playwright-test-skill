@@ -1,12 +1,14 @@
 # Playwright Test Skill
 
-A skill that teaches AI agents how to debug web E2E tests through a manual-first CDP approach, backed by a CLI for step-by-step browser interaction.
+A skill that teaches AI agents how to turn unknown or unstable browser flows into reliable E2E tests or defensible diagnoses through manual-first CDP exploration, backed by a CLI for step-by-step browser observation and interaction.
 
 ## What this is
 
 This is a **skill** for AI coding agents — a reusable capability definition that prescribes a methodology for writing reliable E2E tests. The skill is backed by a CLI tool (`pw-test`) that provides step-by-step browser interaction primitives, enabling the agent to explore a live page before committing to automation.
 
-The core insight: E2E test writing is an exploration problem, not a coding problem. You can't write reliable automation for a flow you haven't observed. The skill teaches agents to explore first (using the CLI to step through a real browser session), then automate (writing a Playwright script that reproduces the observed flow).
+The core insight: E2E test writing is often an exploration problem, not just a coding problem. You can't write reliable automation for a flow you haven't observed. The skill teaches agents to explore first (using the CLI to step through a real browser session), then automate or diagnose from observed reality.
+
+Use it for third-party SSO, OTP, OAuth callbacks, dynamic SPAs, unpredictable modals, and failing E2E tests where the agent first needs to classify whether the failure is product behavior, environment/config, browser state, or test data. Skip it for simple deterministic tests that can be written directly from the code.
 
 ## Install
 
@@ -33,8 +35,10 @@ On macOS, the Chromium path is typically:
 pw-test goto "http://localhost:3000"
 pw-test snapshot
 pw-test click "button:has-text('Sign in')"
+pw-test wait-for-url "**/sign-in**"
 pw-test fill "input[name='email']" "alice@example.com"
 pw-test snapshot
+pw-test diagnose /tmp/login-debug.png
 pw-test screenshot /tmp/page.png
 ```
 
@@ -53,6 +57,10 @@ rm -rf /tmp/pw_debug_profile
 | `click <selector>` | Click an element (Playwright selector syntax) |
 | `fill <selector> <value>` | Fill an input field |
 | `snapshot` | Print full page state: URL, title, body text, all inputs, buttons, links, modals |
+| `diagnose [screenshot_path]` | Print URL/title/referrer/body/controls and optionally save screenshot |
+| `elements <selector>` | Print count, text, visibility, enabled state, and bounding boxes |
+| `wait-for-selector <selector> [state] [timeout_ms]` | Wait for selector state (`visible` by default) |
+| `wait-for-url <pattern> [timeout_ms]` | Wait for URL to match a Playwright URL pattern |
 | `wait <ms>` | Wait for a duration in milliseconds |
 | `reload` | Reload the page |
 | `eval <js>` | Evaluate JavaScript in page context |
