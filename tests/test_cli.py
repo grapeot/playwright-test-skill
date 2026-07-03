@@ -10,6 +10,39 @@ import pytest
 from playwright_test_skill.cli import main, async_main, CDP_URL, USAGE
 
 
+class FakePage:
+    url = "https://example.com/current"
+
+    async def title(self):
+        return "Example"
+
+    async def evaluate(self, _script):
+        return None
+
+
+class FakeContext:
+    pages = [FakePage()]
+
+
+class FakeBrowser:
+    contexts = [FakeContext()]
+
+
+class FakeChromium:
+    async def connect_over_cdp(self, _url):
+        return FakeBrowser()
+
+
+class FakePlaywright:
+    chromium = FakeChromium()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
 def test_no_args_prints_usage_and_returns_1(capsys):
     rc = main([])
     assert rc == 1
@@ -23,7 +56,23 @@ def test_cdp_url_default():
 
 
 def test_usage_contains_all_commands():
-    for cmd in ["goto", "click", "fill", "snapshot", "wait", "reload", "eval", "url", "title", "screenshot", "storage"]:
+    for cmd in [
+        "goto",
+        "click",
+        "fill",
+        "snapshot",
+        "diagnose",
+        "elements",
+        "wait-for-selector",
+        "wait-for-url",
+        "wait",
+        "reload",
+        "eval",
+        "url",
+        "title",
+        "screenshot",
+        "storage",
+    ]:
         assert cmd in USAGE
 
 
@@ -70,3 +119,34 @@ async def test_screenshot_requires_path(capsys):
     rc = await async_main(["screenshot"])
     assert rc == 1
     assert "file path" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_elements_requires_selector(capsys):
+    rc = await async_main(["elements"])
+    assert rc == 1
+    assert "selector" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_wait_for_selector_requires_selector(capsys):
+    rc = await async_main(["wait-for-selector"])
+    assert rc == 1
+    assert "selector" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_wait_for_url_requires_pattern(capsys):
+    rc = await async_main(["wait-for-url"])
+    assert rc == 1
+    assert "URL pattern" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_valid_command_runs_cdp_flow(monkeypatch, capsys):
+    monkeypatch.setattr("playwright.async_api.async_playwright", lambda: FakePlaywright())
+
+    rc = await async_main(["url"])
+
+    assert rc == 0
+    assert "https://example.com/current" in capsys.readouterr().out

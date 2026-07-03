@@ -15,6 +15,10 @@ Commands:
   click <selector>        Click an element
   fill <selector> <val>  Fill an input
   snapshot                Print full page state (URL, text, inputs, buttons, links, modals)
+  diagnose [screenshot]   Print debug bundle; optionally save screenshot
+  elements <selector>     Print count/text/visibility/bounding boxes for matching elements
+  wait-for-selector <sel> Wait until selector reaches a state (default: visible)
+  wait-for-url <pattern>  Wait until current URL matches a glob/regex pattern
   wait <ms>              Wait for duration
   reload                 Reload the page
   eval <js>              Evaluate JavaScript and print result
@@ -100,6 +104,106 @@ async def _snapshot(page) -> str:
     return "\n".join(lines)
 
 
+async def _navigation_state(page) -> list[str]:
+    """Return URL-oriented diagnostics that survive normal page rendering."""
+    lines = []
+    lines.append(f"URL: {page.url}")
+    lines.append(f"Title: {await page.title()}")
+    try:
+        referrer = await page.evaluate("() => document.referrer")
+        lines.append(f"Referrer: {referrer}")
+    except Exception:
+        lines.append("Referrer: unavailable")
+    try:
+        perf_entries = await page.evaluate(
+            """() => performance.getEntriesByType('navigation').map(e => ({
+                name: e.name,
+                type: e.type,
+                startTime: Math.round(e.startTime),
+                duration: Math.round(e.duration),
+            }))"""
+        )
+        lines.append(f"Navigation entries: {perf_entries}")
+    except Exception:
+        lines.append("Navigation entries: unavailable")
+    return lines
+
+
+async def _elements(page, selector: str) -> str:
+    """Print structured details for elements matching a selector."""
+    lines = [f"=== ELEMENTS {selector!r} ==="]
+    locator = page.locator(selector)
+    count = await locator.count()
+    lines.append(f"Count: {count}")
+    for i in range(min(count, 20)):
+        item = locator.nth(i)
+        try:
+            text = (await item.inner_text(timeout=1000)).strip().replace("\n", " ")[:200]
+        except Exception:
+            text = ""
+        try:
+            visible = await item.is_visible(timeout=1000)
+        except Exception:
+            visible = False
+        try:
+            enabled = await item.is_enabled(timeout=1000)
+        except Exception:
+            enabled = False
+        try:
+            box = await item.bounding_box(timeout=1000)
+        except Exception:
+            box = None
+        lines.append(f"[{i}] visible={visible} enabled={enabled} box={box} text={text!r}")
+    if count > 20:
+        lines.append(f"... {count - 20} more not shown")
+    lines.append("=== END ELEMENTS ===")
+    return "\n".join(lines)
+
+
+async def _diagnose(page, screenshot_path: str | None = None) -> str:
+    """Print a compact debug bundle for failed waits, auth redirects, and selector misses."""
+    lines = ["=== DIAGNOSE ==="]
+    lines.extend(await _navigation_state(page))
+    try:
+        body_text = await page.locator("body").inner_text(timeout=3000)
+        lines.append(f"Body text (first 3000):\n{body_text[:3000]}")
+    except Exception as exc:
+        lines.append(f"Body text unavailable: {exc}")
+    lines.append("\n--- Visible controls ---")
+    for selector in ["input", "button", "a", "[role='dialog']"]:
+        lines.append(await _elements(page, selector))
+    try:
+        console_errors = await page.evaluate("() => window.__pwTestConsoleErrors || []")
+        lines.append(f"\nConsole errors captured: {console_errors}")
+    except Exception:
+        lines.append("\nConsole errors captured: unavailable")
+    if screenshot_path:
+        await page.screenshot(path=screenshot_path, full_page=True)
+        lines.append(f"Screenshot saved: {screenshot_path}")
+    lines.append("=== END DIAGNOSE ===")
+    return "\n".join(lines)
+
+
+async def _install_console_hook(page) -> None:
+    """Best-effort in-page console error capture for later diagnose output."""
+    try:
+        await page.evaluate(
+            """() => {
+                if (!window.__pwTestConsoleHooked) {
+                    window.__pwTestConsoleErrors = window.__pwTestConsoleErrors || [];
+                    window.__pwTestConsoleHooked = true;
+                    const oldError = console.error;
+                    console.error = (...args) => {
+                        window.__pwTestConsoleErrors.push(args.map(String).join(' '));
+                        oldError.apply(console, args);
+                    };
+                }
+            }"""
+        )
+    except Exception:
+        return
+
+
 async def _storage(context, page) -> str:
     """Print cookies and localStorage."""
     lines = []
@@ -146,6 +250,15 @@ async def async_main(argv: list[str] | None = None) -> int:
     if cmd == "screenshot" and not args:
         print("Error: screenshot requires a file path", file=sys.stderr)
         return 1
+    if cmd == "elements" and not args:
+        print("Error: elements requires a selector argument", file=sys.stderr)
+        return 1
+    if cmd == "wait-for-selector" and not args:
+        print("Error: wait-for-selector requires a selector argument", file=sys.stderr)
+        return 1
+    if cmd == "wait-for-url" and not args:
+        print("Error: wait-for-url requires a URL pattern argument", file=sys.stderr)
+        return 1
 
     try:
         from playwright.async_api import async_playwright
@@ -165,6 +278,7 @@ async def async_main(argv: list[str] | None = None) -> int:
 
             context = browser.contexts[0] if browser.contexts else await browser.new_context()
             page = context.pages[0] if context.pages else await context.new_page()
+            await _install_console_hook(page)
 
             if cmd == "goto":
                 await page.goto(args[0], wait_until="domcontentloaded", timeout=30000)
@@ -193,6 +307,23 @@ async def async_main(argv: list[str] | None = None) -> int:
 
             elif cmd == "snapshot":
                 print(await _snapshot(page))
+
+            elif cmd == "diagnose":
+                print(await _diagnose(page, args[0] if args else None))
+
+            elif cmd == "elements":
+                print(await _elements(page, args[0]))
+
+            elif cmd == "wait-for-selector":
+                state = args[1] if len(args) > 1 else "visible"
+                timeout = int(args[2]) if len(args) > 2 else 10000
+                await page.locator(args[0]).first.wait_for(state=state, timeout=timeout)
+                print(f"Selector ready: {args[0]} state={state}")
+
+            elif cmd == "wait-for-url":
+                timeout = int(args[1]) if len(args) > 1 else 10000
+                await page.wait_for_url(args[0], timeout=timeout)
+                print(f"URL matched: {page.url}")
 
             elif cmd == "wait":
                 ms = int(args[0])
@@ -227,7 +358,7 @@ async def async_main(argv: list[str] | None = None) -> int:
 
             return 0
 
-        return await _run()
+    return await _run()
 
 
 def main(argv: list[str] | None = None) -> int:

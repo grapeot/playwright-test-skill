@@ -23,13 +23,26 @@ Unit tests cover CLI argument validation and command routing without requiring a
 - `test_wait_requires_duration`: wait without ms fails
 - `test_eval_requires_expression`: eval without JS fails
 - `test_screenshot_requires_path`: screenshot without path fails
+- `test_elements_requires_selector`: elements without selector fails
+- `test_wait_for_selector_requires_selector`: wait-for-selector without selector fails
+- `test_wait_for_url_requires_pattern`: wait-for-url without URL pattern fails
+- `test_valid_command_runs_cdp_flow`: a valid command connects to the fake CDP flow and prints output
 
 ## Integration Test Coverage (future)
 
 When a CDP Chrome instance is running on port 9222:
 - `goto` navigates and prints URL+title
 - `snapshot` prints page state with inputs/buttons/links
+- `diagnose` prints URL/body/control debug bundle and optionally saves screenshot
+- `elements` prints selector count/text/visibility/bounding boxes
+- `wait-for-selector` waits on DOM state without fixed sleeps
+- `wait-for-url` waits on redirect/callback URL state
 - `click` clicks a visible element
 - `fill` fills a visible input
 - `eval` evaluates JS and prints result
 - `screenshot` saves a PNG file
+
+## Latest Verification
+
+- Unit tests: `.venv/bin/python -m pytest tests/ -v` → 13 passed
+- Live smoke: launched headless Chromium with CDP and verified `goto`, `wait-for-selector`, `elements`, and `diagnose`

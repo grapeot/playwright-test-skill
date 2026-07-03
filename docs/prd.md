@@ -2,13 +2,15 @@
 
 ## Bottom Line
 
-A skill that teaches AI agents how to debug web E2E tests through a manual-first CDP approach: explore the page step by step, observe what actually happens at each interaction, then write automation that reproduces the discovered flow. The skill is backed by a CLI (`pw-test`) that provides the step-by-step primitives — goto, snapshot, click, fill — so the agent can interact with a live browser from the terminal without writing a full script upfront.
+A skill that teaches AI agents how to turn unknown or unstable browser flows into reliable E2E tests or defensible diagnoses through a manual-first CDP approach: explore the page step by step, observe what actually happens at each interaction, then write automation or switch to a more deterministic protocol/API assertion. The skill is backed by a CLI (`pw-test`) that provides observation and interaction primitives — goto, snapshot, diagnose, wait-for-selector, wait-for-url, click, fill — so the agent can interact with a live browser from the terminal without writing a full script upfront.
 
 ## Problem
 
 When writing E2E tests for web applications (especially with third-party SSO, multi-step registration, or dynamic modals), the agent doesn't know what the page will do next. Writing a full Playwright automation script upfront leads to repeated failures: wrong selectors, unexpected modals, missing waits, changed flows. The agent guesses and retries in a tight loop, burning tokens without making real progress.
 
-The root cause is that E2E test writing is an exploration problem, not a coding problem. You can't write reliable automation for a flow you haven't observed. The skill addresses this by prescribing a manual-first methodology — explore first, automate second — and providing the CLI tooling that makes incremental exploration practical from a terminal.
+The root cause is that E2E test writing is often an exploration problem, not a coding problem. You can't write reliable automation for a flow you haven't observed. The skill addresses this by prescribing a manual-first methodology — explore first, automate or diagnose second — and providing the CLI tooling that makes incremental exploration practical from a terminal.
+
+The skill is most useful when a browser flow crosses unstable boundaries: SSO providers, OTP, OAuth callbacks, payment, dynamic modals, SPA async rendering, or failures where the agent must classify whether the issue is product behavior, test environment, third-party auth configuration, stale browser state, or test data state.
 
 ## Skill vs Tool
 
@@ -21,6 +23,7 @@ AI coding agents (Claude Code, Cursor, OpenCode, Codex, etc.) that need to:
 2. Explore a web application's DOM structure before writing automation
 3. Understand SSO login flows that have multiple modals and redirects
 4. Verify that UI changes render correctly by inspecting the live DOM
+5. Capture diagnostics before changing code when selectors, redirects, or expected page states do not appear
 
 ## Skill Methodology
 
@@ -30,9 +33,10 @@ The skill prescribes a manual-first approach:
 2. **Navigate** to the target page
 3. **Snapshot** to see the full DOM state in text form
 4. **Interact** (click, fill) based on what the snapshot revealed
-5. **Snapshot again** after each interaction to observe what changed
-6. **Repeat** until the full flow is understood
-7. **Write the Playwright test** that reproduces the discovered steps with `wait_for` selectors instead of fixed timeouts
+5. **Wait on conditions** (`wait-for-selector`, `wait-for-url`) instead of fixed sleeps when the expected next state is known
+6. **Diagnose before retrying** when the expected state is missing
+7. **Repeat** until the full flow is understood
+8. **Write the Playwright test** that reproduces the discovered steps with condition-based waits instead of fixed timeouts, or use a hybrid browser/API test when that gives a better assertion boundary
 
 The CLI provides the primitives for steps 1-6. Step 7 is the agent's normal coding work, now grounded in observed reality rather than guesses.
 
@@ -42,6 +46,10 @@ The CLI provides the primitives for steps 1-6. Step 7 is the agent's normal codi
 - `click <selector>` — Click an element by CSS/Playwright selector
 - `fill <selector> <value>` — Fill an input with a value
 - `snapshot` — Print full page state: URL, title, body text, all inputs, all buttons, all links, modal content
+- `diagnose [screenshot_path]` — Print a compact debug bundle; optionally save a full-page screenshot
+- `elements <selector>` — Print count/text/visibility/enabled state/bounding boxes for matches
+- `wait-for-selector <selector> [state] [timeout_ms]` — Wait for selector state (`visible` by default)
+- `wait-for-url <pattern> [timeout_ms]` — Wait for current URL to match a Playwright URL pattern
 - `wait <ms>` — Wait for a duration
 - `reload` — Reload the page
 - `eval <js>` — Evaluate JavaScript and print the result
@@ -67,6 +75,8 @@ The CLI provides the primitives for steps 1-6. Step 7 is the agent's normal codi
 3. The CLI works with any Chrome/Chromium instance that has CDP enabled
 4. Known pitfalls cover real failure modes encountered in practice, not predicted hypotheticals
 5. Tests cover CLI argument validation and command routing
+6. The skill explains when to use CDP exploration and when to avoid it for deterministic tests
+7. The skill documents the hybrid E2E pattern for third-party auth/callback flows
 
 ## Non-Goals
 

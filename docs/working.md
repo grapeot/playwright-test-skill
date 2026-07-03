@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-07-03
+
+- Reframed the skill around when to use CDP exploration: unknown browser flows, third-party auth/callbacks, dynamic SPAs, and E2E failure triage
+- Added hybrid E2E guidance: use browser automation to acquire real session/code artifacts, then use API/protocol assertions when they are more deterministic
+- Added CLI commands: `diagnose`, `elements`, `wait-for-selector`, `wait-for-url`
+- Fixed valid-command execution path and added a fake CDP regression test so command dispatch cannot silently return without running
+- Updated README, PRD, RFC, test strategy, and skill file for the new triage/observation primitives
+- Expanded unit tests for new command argument validation; latest suite: 13 passed
+- Live smoke verified against headless Chromium CDP: `goto`, `wait-for-selector`, `elements`, `diagnose`
+
 ## 2026-06-29
 
 - Project scaffolded from CDP debugging experience during Buddy Pass E2E development

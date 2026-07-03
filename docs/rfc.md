@@ -6,7 +6,7 @@ This project is a **skill** (reusable AI agent capability definition) backed by 
 
 ```text
 Skill file (skill_playwright_test.md)
-  └── defines: goal, methodology, acceptance criteria, known pitfalls
+  └── defines: when to use, goal, methodology, acceptance criteria, known pitfalls
   └── references: CLI as available resource
 
 CLI (pw-test)
@@ -18,7 +18,7 @@ Agent workflow:
   1. Reads skill file → understands manual-first methodology
   2. Starts CDP Chrome
   3. Uses pw-test commands to explore page step by step
-  4. Writes Playwright test reproducing observed flow
+  4. Writes Playwright test or switches to hybrid browser/API assertion
   5. Cleans up
 ```
 
@@ -26,7 +26,8 @@ Agent workflow:
 
 The skill file (`skills/skill_playwright_test.md`) follows the meta-skill guidelines:
 - **Goal**: one-sentence definition of what the skill accomplishes
-- **Why**: the problem this skill solves (exploration before automation)
+- **When to use**: unknown browser flows, SSO/callbacks, dynamic SPAs, or failure triage
+- **Why**: the problem this skill solves (exploration before automation or diagnosis)
 - **Acceptance criteria**: testable success conditions
 - **Methodology**: manual-first CDP debugging approach (explore → observe → automate)
 - **Available resources**: CLI commands, CDP Chrome setup, Playwright dependency
@@ -84,8 +85,44 @@ The core observation primitive. Prints:
 - Modal content (ReactModalPortal, `[role="dialog"]`, `.modal`)
 - Plain text format, parseable by agents without vision
 
+### `diagnose [screenshot_path]`
+Failure triage primitive. Prints:
+- URL, title, document referrer, browser navigation performance entries
+- Body text (first 3000 chars)
+- Structured details for visible inputs, buttons, links, and dialogs
+- Captured console errors when available
+- Optional full-page screenshot path
+
+Agents should run this before changing code or adding sleeps when an expected selector or URL does not appear.
+
+### `elements <selector>`
+Selector inspection primitive. Prints:
+- Match count
+- Up to 20 element summaries
+- Text, visibility, enabled state, and bounding box
+
+### `wait-for-selector <selector> [state] [timeout_ms]`
+- Waits for the first matching locator to reach `state`
+- Default state: `visible`
+- Default timeout: 10s
+- Intended to replace fixed sleeps when the next DOM state is known
+
+### `wait-for-url <pattern> [timeout_ms]`
+- Waits for page URL to match a Playwright URL pattern, e.g. `**/callback**`
+- Default timeout: 10s
+- Useful for SSO, OAuth, and redirect-heavy flows
+
 ### `wait <ms>` / `reload` / `eval <js>` / `url` / `title` / `screenshot <path>` / `storage`
 Standard utilities. See CLI `--help` for details.
+
+## Hybrid E2E Boundary
+
+The CLI intentionally does not become a full login robot or test runner. For third-party auth/callback flows, the recommended pattern is:
+
+- Use browser automation for the part that genuinely requires a browser or provider UI.
+- Use protocol/API calls for deterministic product assertions when they provide a clearer boundary.
+
+This keeps the skill focused on observation and interaction primitives while preserving agent judgment about where the reliable E2E boundary lies.
 
 ## Dependencies
 
@@ -101,5 +138,6 @@ Standard utilities. See CLI `--help` for details.
 
 - CDP connection failure: clear error with instructions to start Chrome
 - Element not found: print timeout error, don't crash
+- Missing expected state: `diagnose` provides URL/body/control/screenshot context for triage
 - JS eval failure: print exception message
 - All errors go to stderr, results go to stdout
