@@ -31,3 +31,10 @@
 - Origin: Typefully token refresh experiment — persistent CDP profile + passive header capture + verified .env write-back, run end-to-end
 - Language review via AGY with fact-drift audit (13 invariants checked, all preserved); sanitized masked examples and env field names for public repo
 - PR #3 merged to master
+
+## 2026-09-23 (2)
+
+- Reference implementation added: `scripts/session_keeper_refresher.py` (single-site, SITE block inlined)
+- 10 unit tests for mask/JWT-decode/env-update/backup/idempotency gates (23 total pass)
+- Live end-to-end verified against the real site: capture -> verify 200 -> apply on staged .env -> backup + readback + status
+- Skill doc CLI contract now points to the reference implementation and states the copy-per-site workflow
