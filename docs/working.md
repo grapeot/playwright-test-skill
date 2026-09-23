@@ -24,3 +24,10 @@
 - Each CLI invocation must be a separate process; the browser persists because it's a separate Chrome process started by the agent
 - `snapshot` text output is more useful than screenshots for AI agents that can't process images
 - CDP Chrome profile must be cleaned between sessions to avoid stale SSO session tokens causing infinite redirect loops
+
+## 2026-09-23
+
+- Third skill added: `skills/skill_session_keeper.md` (browser session credential keeper)
+- Origin: Typefully token refresh experiment — persistent CDP profile + passive header capture + verified .env write-back, run end-to-end
+- Language review via AGY with fact-drift audit (13 invariants checked, all preserved); sanitized masked examples and env field names for public repo
+- PR #3 merged to master
