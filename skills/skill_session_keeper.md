@@ -51,6 +51,8 @@ session-keeper capture --site <name> [--port 9222]
 - `status`: Reads local files only. Decodes JWT payload fields (`exp`, `user_id` if present) without network calls.
 - `capture`: Connects over CDP, navigates to the target site, listens at the protocol level (`page.on("request")`), extracts the requested headers from the first API request that carries them, verifies them, and — only with `--apply` and a passing verification — updates the target file.
 
+**Reference implementation.** `scripts/session_keeper_refresher.py` in this repo is a complete, runnable single-site implementation with the site configuration inlined in one `SITE` block. To adapt it for a new site, copy the file, rewrite the `SITE` block (URL, API marker, header names, verify URL, env field map) and the header-extraction rule, then re-run the capture and verification paths against that site's traffic. Do not build a shared multi-site engine on top of it: deep per-site customization is the expected workflow, and the copy step is deliberate.
+
 ## Design Rules (enforcing constraints)
 
 **Verify before write.** A captured value is a candidate, not a credential. Probe the configured read-only endpoint with the candidate values; only a 200 response authorizes `--apply`. If the site has no clean read-only endpoint, `--apply` must be refused — output the captured values for human confirmation instead. This is a hard constraint, not a suggestion.
