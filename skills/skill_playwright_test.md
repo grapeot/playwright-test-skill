@@ -41,7 +41,7 @@ The core judgment is not "drive everything through the UI." For complex SSO or c
 ## Methodology
 
 1. **Start CDP Chrome** with a fresh user-data-dir (clean profile avoids stale SSO session tokens)
-2. **Navigate** to the target page with `pw-test goto`
+2. **Navigate** to the entry page with `pw-test goto`. For subsequent navigation within the app, **click links found in the snapshot** rather than constructing URLs — web app URL structures are not stable contracts and guessed deep links frequently 404. If a link's `href` is visible in the snapshot, it may be used directly with `goto`; otherwise click the link element itself
 3. **Snapshot** with `pw-test snapshot` to see the full DOM state — this is the primary tool
 4. **Interact** with `pw-test click`/`fill` based on what the snapshot revealed
 5. **Wait on conditions**, not time: use `wait-for-selector` or `wait-for-url` when the next state is known
@@ -134,6 +134,14 @@ Use this pattern when full UI automation is dominated by third-party redirects, 
 **Cause:** The test is trying to drive every step through the UI even when only part of the flow requires a browser.
 
 **Fix:** Use the hybrid E2E pattern. Let Playwright acquire the realistic browser/session artifact, then verify product behavior through API/protocol calls when that gives a more deterministic assertion.
+
+### 7. Guessed deep-link URLs 404
+
+**Symptom:** `pw-test goto "https://app.example.com/settings/statements"` returns a 404 or redirects to a login/error page, even though the feature exists in the app.
+
+**Cause:** Web apps change their URL structures without notice. There is no stable public contract for in-app navigation paths. The agent assumed a URL pattern from the feature name.
+
+**Fix:** Navigate by clicking. Take a snapshot of the current page, find the navigation link in the DOM (sidebar, top nav, breadcrumbs, or in-page links), and click it. The discovered `href` is the only reliable URL. For SPAs, clicking the link triggers the correct route change with all required context (auth tokens, referer, session state).
 
 ## Relationship to other skills
 
